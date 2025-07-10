@@ -1,17 +1,14 @@
 import { SUMMARY_SYSTEM_PROMPT } from "@/utils/prompts";
 import OpenAI from "openai";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("Missing OpenAI API key");
-}
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const client = new OpenAI({
+  apiKey: process.env.OPEN_API_KEY,
 });
 
-export async function generateSummaryFromOpenAI(pdfText: string) {
+export async function generateSummaryFromOpenAI(pdftext: string): Promise<string> {
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
@@ -19,17 +16,29 @@ export async function generateSummaryFromOpenAI(pdfText: string) {
         },
         {
           role: "user",
-          content: `Transform this document into an engaging, easy-to-read summary with contextually relevant emojis and proper markdown formatting:\n\n${pdfText}`,
+          content: `Transform this document into an engaging, easy-to-read summary with contextually relevant emojis and proper markdown formatting:\n\n${pdftext}.`,
         },
       ],
       temperature: 0.7,
       max_tokens: 1500,
     });
-    return completion.choices?.[0]?.message?.content || "No summary generated.";
-  } catch (error: any) {
-    if (error?.status === 429) {
-      throw new Error("RATE_LIMIT_EXCEEDED");
+    const content = completion.choices[0].message.content;
+    if (content === null) {
+      throw new Error("OpenAI response content is null");
     }
-    throw error;
+    return content;
+  } catch (err: unknown) {
+    // Type guard: ensure err is an object with a status property
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "status" in err
+    ) {
+      const errorWithStatus = err as { status?: number };
+      if (errorWithStatus.status === 429) {
+        throw new Error("RATE_LIMIT_EXCEEDED");
+      }
+    }
+    throw err;
   }
 }
