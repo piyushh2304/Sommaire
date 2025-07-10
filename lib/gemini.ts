@@ -1,74 +1,27 @@
-// import { GoogleGenerativeAI } from '@google/generative-ai';
-// import { SUMMARY_SYSTEM_PROMPT } from '@/utils/prompts';
-
-// const geneAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
-// export const generateSummaryFromGemini = async (pdfText) => {
-//   try {
-//     const model = geneAI.getGenerativeModel({
-//       // model: 'gemini-2.0-flash',
-//       model: 'gemini-1.5-pro-002',
-//       generationConfig: {
-//         temperature: 0.7,
-//         maxOutputTokens: 1500,
-//       },
-//     });
-
-//     const prompt = {
-//       contents: [
-//         {
-//           role: 'user',
-//           parts: [
-//             { text: SUMMARY_SYSTEM_PROMPT },
-//             {
-//               text: `Transform this document into an engaging, easy—to—read summary with contextually relevant emojis and proper markdown formatting:\n\n${pdfText}`,
-//             },
-//           ],
-//         },
-//       ],
-//     };
-//     const result = await model.generateContent(prompt);
-//     const response = await result.response;
-//     const responseText = await response.text();
-//     if (!responseText) {
-//       throw new Error(`Empty Response from Gemini`);
-//     }
-//     return responseText;
-//   } catch (err) {
-//     console.error('Gemini API Error', err);
-//     throw err;
-//   }
-// };
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export async function generateSummaryFromGemini(text: string, maxRetries = 3): Promise<string> {
+export async function generateSummaryFromGemini(
+  text: string,
+  maxRetries = 3,
+): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    throw new Error("Missing Gemini API key - please set GEMINI_API_KEY environment variable");
+    throw new Error(
+      "Missing Gemini API key - please set GEMINI_API_KEY environment variable",
+    );
   }
 
   let retries = 0;
-  let lastError;
+  let lastError: unknown;
 
   while (retries <= maxRetries) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Switch to flash model
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const prompt = {
-        contents: [
-          {
-            parts: [
-              {
-                text: `Please summarize the following text in a concise manner, highlighting the key points and main ideas:
-                
-                ${text}`,
-              },
-            ],
-          },
-        ],
-      };
+      // Pass the prompt as a string, not as an object with contents/parts
+      const prompt = `Please summarize the following text in a concise manner, highlighting the key points and main ideas:\n\n${text}`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
@@ -79,23 +32,56 @@ export async function generateSummaryFromGemini(text: string, maxRetries = 3): P
       }
 
       return responseText;
-    } catch (error: any) {
+    } catch (error: unknown) {
       lastError = error;
 
-      // Check if it's a rate limit error (429)
-      if (error.status === 429) {
-        // Extract retry delay from error if available, or use exponential backoff
-        const retryDelay = error.errorDetails?.[0]?.["@type"]?.includes("RetryInfo")
-          ? parseInt(error.errorDetails[0].retryDelay.replace('s', '')) * 1000
-          : Math.pow(2, retries) * 1000;
+      // Type guard to check if error is an object with a status property
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "status" in error
+      ) {
+        // Narrow the error type for safe property access
+        const err = error as {
+          status?: number;
+          errorDetails?: Array<{
+            [key: string]: unknown;
+            retryDelay?: string;
+            "@type"?: string;
+          }>;
+        };
 
-        console.log(`Rate limit exceeded. Retrying in ${retryDelay / 1000} seconds...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        retries++;
-      } else {
-        // For other errors, don't retry
-        break;
+        // Handle rate limiting (status 429)
+        if (err.status === 429) {
+          let retryDelay = Math.pow(2, retries) * 1000; // default exponential backoff
+
+          // If errorDetails has RetryInfo, use its retryDelay
+          if (
+            err.errorDetails &&
+            err.errorDetails[0] &&
+            typeof err.errorDetails[0]["@type"] === "string" &&
+            err.errorDetails[0]["@type"]?.includes("RetryInfo") &&
+            typeof err.errorDetails[0].retryDelay === "string"
+          ) {
+            const parsed = parseInt(
+              err.errorDetails[0].retryDelay.replace("s", "")
+            );
+            if (!isNaN(parsed)) {
+              retryDelay = parsed * 1000;
+            }
+          }
+
+          console.log(
+            `Rate limit exceeded. Retrying in ${retryDelay / 1000} seconds...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+          retries++;
+          continue;
+        }
       }
+
+      // For all other errors or if type guard fails, break and throw
+      break;
     }
   }
 
