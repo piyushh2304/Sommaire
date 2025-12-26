@@ -3,7 +3,7 @@
 Transform PDFs into a stunning reel of meaningful insights using the power of AI!  
 Built with the latest web technologies and modern UI frameworks to provide a seamless and intelligent summarization experience.
 
-🔗 **Live Demo**: [https://sommaire-beta.vercel.app](https://sommaire-beta.vercel.app) <!-- 🔁 Replace this with your actual Vercel deploy link -->
+🔗 **Live Demo**: [https://sommaire-alpha.vercel.app/](https://sommaire-alpha.vercel.app/) <!-- 🔁 Replace this with your actual Vercel deploy link -->
 
 ---
     
