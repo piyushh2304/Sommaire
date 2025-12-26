@@ -12,7 +12,7 @@ export default function Page() {
           lg:px-8 lg:pt-12"
       >
         <BgGradient className="from-rose-400 via-rose-300 to-orange-200" />
-        <SignIn />
+        <SignIn forceRedirectUrl="/dashboard" />
       </div>
     </section>
   );
