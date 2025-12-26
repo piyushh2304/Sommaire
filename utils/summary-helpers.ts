@@ -42,7 +42,13 @@ export function parsePoint(point: string) {
 export function parseEmojiPoint(content: string) {
   const cleanContent = content.replace(/^[•]\s*/, "").trim();
   const matches = cleanContent.match(/^(\p{Emoji}+)(.+)$/u);
-  if (!matches) return null;
+
+  if (!matches) {
+    return {
+      emoji: "",
+      text: cleanContent
+    }
+  }
 
   const [_, emoji, text] = matches;
   return {

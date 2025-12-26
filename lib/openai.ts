@@ -16,7 +16,15 @@ export async function generateSummaryFromOpenAI(pdftext: string): Promise<string
         },
         {
           role: "user",
-          content: `Transform this document into an engaging, easy-to-read summary with contextually relevant emojis and proper markdown formatting:\n\n${pdftext}.`,
+          content: `Summarize the following text.
+          Strictly follow this format:
+          1. Divide the summary into 4-5 "pages" or sections.
+          2. Each section MUST start with a line containing only "# " followed by a concise Title.
+          3. Under each title, provide 4-5 key points.
+          4. Each point MUST start with a bullet point "• ".
+          
+          Text:
+          \n\n${pdftext}.`,
         },
       ],
       temperature: 0.7,

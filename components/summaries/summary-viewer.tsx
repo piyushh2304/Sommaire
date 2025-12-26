@@ -10,7 +10,7 @@ const SectionTitle = ({ title }: { title: string }) => {
   return (
     <div
       className="flex flex-col gap-2 mb-6 
-    top-0 pt-2 pb-4 bg-background/80 backdrop-blur-xs z-10"
+    top-0 pt-2 pb-4 z-10"
     >
       <h2 className="text-2xl sm:text-3xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
       {title}

@@ -5,7 +5,7 @@ import { generateSummaryFromGemini } from "@/lib/gemini";
 import { fetchANdExtractPdfText } from "@/lib/langchain";
 import { generateSummaryFromOpenAI } from "@/lib/openai";
 import { formatFileNameAsTitle } from "@/utils/format-utils";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
 interface PdfSummary {
@@ -47,7 +47,7 @@ export async function generatePdfSummary({
     };
   }
 
- 
+
   if (!fileUrl) {
     return {
       success: false,
@@ -67,12 +67,13 @@ export async function generatePdfSummary({
       console.log(error);
       //call gemini-AI
       if (error instanceof Error && error.message === "RATE_LIMIT_EXCEEDED") {
+        console.log("Gemini Rate Limit hit. Attempting fallback to OpenAI...");
         try {
           summary = await generateSummaryFromOpenAI(pdfText);
-        } catch (geminiError) {
+        } catch (openAIError) {
           console.log(
-            "Gemini API failed after OPENAI quote exceeded",
-            geminiError
+            "OpenAI API fallback failed",
+            openAIError
           );
           throw new Error(
             "Failed to generate summary with available AI providers"
@@ -156,6 +157,31 @@ export async function storePdfSummaryAction({
         message: "User not found",
       };
     }
+
+    // Ensure user exists in DB before attempting to save summary (prevents FK violation)
+    const sql = await getDbConnection();
+    const [userExists] = await sql`SELECT id FROM users WHERE id = ${userId}`;
+
+    if (!userExists) {
+      console.log("User not found in DB, executing proactive creation...");
+      const user = await currentUser();
+      const email = user?.emailAddresses[0]?.emailAddress;
+      const fullName = user?.firstName + " " + user?.lastName;
+
+      if (email) {
+        try {
+          await sql`
+            INSERT INTO users (id, email, full_name, status)
+            VALUES (${userId}, ${email}, ${fullName}, 'active')
+            ON CONFLICT (id) DO NOTHING
+          `;
+          console.log("User created successfully.");
+        } catch (dbError) {
+          console.error("Failed to create user during proactive check:", dbError);
+        }
+      }
+    }
+
     savedSummary = await savePdfSummary({
       userId,
       fileUrl,
